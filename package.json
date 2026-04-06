@@ -1,0 +1,17 @@
+{
+  "name": "cch-proxy",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Claude Code CCH injection proxy for OpenCode",
+  "main": "proxy.mjs",
+  "scripts": {
+    "start": "node proxy.mjs",
+    "dev": "node --watch proxy.mjs"
+  },
+  "dependencies": {
+    "xxhash-wasm": "^1.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
