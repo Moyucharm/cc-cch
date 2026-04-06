@@ -1,20 +1,28 @@
 # CCH Proxy
 
-Claude Code CCH 注入代理，让 OpenCode 伪装成 Claude Code CLI 请求 Anthropic API。
+> Claude Code CCH 注入代理，让 OpenCode 伪装成 Claude Code CLI 请求 Anthropic API。
+
+## 背景
+
+Claude Code CLI 在向 Anthropic API 发送请求时，会在 system prompt 中嵌入一个名为 `cch` 的校验哈希值。这个哈希由请求 body 通过 xxhash64 算法计算得出，用于验证请求的完整性。
+
+本代理服务拦截 OpenCode 发往 Anthropic 渠道的请求，自动注入并计算 `cch` 值，使其"看起来"像是来自官方 Claude Code CLI。
 
 ## 支持平台
 
-| 平台 | 入口文件 | 部署方式 |
-|------|----------|----------|
-| **Node.js** | `proxy.mjs` | VPS / 本地运行 |
-| **Deno** | `deno.mjs` | Deno Deploy / 本地运行 |
-| **Cloudflare Workers** | `src/worker.js` | CF Workers 边缘部署 |
+| 平台 | 入口文件 | 部署方式 | 优势 |
+|------|----------|----------|------|
+| **Node.js** | `proxy.mjs` | VPS / 本地运行 | 稳定、无冷启动 |
+| **Deno** | `deno.mjs` | Deno Deploy / 本地 | 免费边缘部署 |
+| **Cloudflare Workers** | `src/worker.js` | CF Workers | 免费、全球边缘 |
 
 ## 快速开始
 
 ### Node.js
 
 ```bash
+git clone https://github.com/your-repo/cc-cch.git
+cd cc-cch
 npm install
 npm start
 ```
@@ -29,61 +37,228 @@ deno run --allow-net --allow-read --allow-env deno.mjs
 
 ```bash
 npm install -g wrangler
+wrangler login
 wrangler deploy
 ```
 
 ## 使用方式
 
-代理运行后，将 OpenCode 的 Anthropic 渠道 `baseURL` 改为：
+### 1. 启动代理
 
-```
-http://127.0.0.1:9876/proxy/<编码后的目标URL>/messages
-```
+代理默认监听 `http://127.0.0.1:9876`
 
-**示例**：目标 `https://api.milki.top/v1`
+### 2. 配置 OpenCode
 
-```json
+修改 `~/.config/opencode/opencode.jsonc`，将 Anthropic 渠道的 `baseURL` 指向代理：
+
+```jsonc
 {
-  "baseURL": "http://127.0.0.1:9876/proxy/https%3A%2F%2Fapi.milki.top%2Fv1"
+  "provider": {
+    "my-anthropic": {
+      "npm": "@ai-sdk/anthropic",
+      "name": "Anthropic via CCH Proxy",
+      "options": {
+        "baseURL": "http://127.0.0.1:9876/proxy/https%3A%2F%2Fapi.anthropic.com%2Fv1"
+      },
+      "models": {
+        "claude-sonnet-4-6": {
+          "name": "Claude Sonnet 4.6"
+        }
+      }
+    }
+  }
 }
 ```
 
-编码规则：`encodeURIComponent("https://api.milki.top/v1")`
+### URL 编码规则
+
+```
+原始目标: https://api.anthropic.com/v1
+编码后:   https%3A%2F%2Fapi.anthropic.com%2Fv1
+
+代理 URL: http://127.0.0.1:9876/proxy/<编码后的目标URL>
+```
+
+JavaScript 编码：`encodeURIComponent("https://api.anthropic.com/v1")`
+
+### 多渠道示例
+
+```jsonc
+// 第三方中转
+"my-proxy": {
+  "options": {
+    "baseURL": "http://127.0.0.1:9876/proxy/https%3A%2F%2Fapi.milki.top%2Fv1"
+  }
+}
+
+// OpenRouter Anthropic
+"openrouter-anthropic": {
+  "options": {
+    "baseURL": "http://127.0.0.1:9876/proxy/https%3A%2F%2Fopenrouter.ai%2Fapi%2Fv1"
+  }
+}
+```
 
 ## 环境变量
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `CCH_PROXY_PORT` | 9876 | 监听端口 |
-| `CCH_MAX_RETRIES` | 3 | 最大重试次数 |
-| `CCH_TIMEOUT` | 120000 | 超时时间 (ms) |
+| `CCH_PROXY_PORT` | `9876` | 监听端口 |
+| `CCH_MAX_RETRIES` | `3` | 上游失败最大重试次数 |
+| `CCH_TIMEOUT` | `120000` | 上游请求超时 (ms) |
+
+Node.js 示例：
+
+```bash
+CCH_PROXY_PORT=9999 CCH_TIMEOUT=60000 npm start
+```
 
 ## 部署指南
 
 ### Deno Deploy
 
-1. 创建 [Deno Deploy](https://deno.com/deploy) 账号
-2. 新建项目，链接 GitHub 仓库
-3. 入口文件设置为 `deno.mjs`
-4. 环境变量在 Dashboard 配置
+1. 登录 [Deno Deploy](https://deno.com/deploy)
+2. 创建新项目，链接 GitHub 仓库
+3. 设置入口文件为 `deno.mjs`
+4. 在 Dashboard 配置环境变量（可选）
+
+部署后获得类似 `https://your-project.deno.dev` 的 URL。
+
+**OpenCode 配置示例**：
+
+```jsonc
+"baseURL": "https://your-project.deno.dev/proxy/https%3A%2F%2Fapi.anthropic.com%2Fv1"
+```
 
 ### Cloudflare Workers
 
-1. 安装 Wrangler: `npm install -g wrangler`
-2. 登录: `wrangler login`
-3. 部署: `wrangler deploy`
-4. 配置自定义域名（可选）
+1. 安装 Wrangler：
 
-部署后获得类似 `https://cch-proxy.<subdomain>.workers.dev` 的 URL。
+   ```bash
+   npm install -g wrangler
+   ```
 
-## 功能
+2. 登录 Cloudflare：
 
-- ✅ CCH 自动注入 (xxhash64 + 低 20 bits)
-- ✅ 多上游渠道支持 (URL 编码)
-- ✅ 空回复自动重试 (最多 3 次)
-- ✅ SSE 流式响应透传
-- ✅ 多平台支持 (Node / Deno / CF Worker)
+   ```bash
+   wrangler login
+   ```
 
-## 原理
+3. 部署：
 
-详见 [reference.md](./reference.md)
+   ```bash
+   wrangler deploy
+   ```
+
+4. （可选）配置自定义域名：修改 `wrangler.toml`
+
+部署后获得类似 `https://cch-proxy.<your-subdomain>.workers.dev` 的 URL。
+
+**OpenCode 配置示例**：
+
+```jsonc
+"baseURL": "https://cch-proxy.your-subdomain.workers.dev/proxy/https%3A%2F%2Fapi.anthropic.com%2Fv1"
+```
+
+### VPS / 自建服务器
+
+推荐使用 PM2 管理进程：
+
+```bash
+npm install -g pm2
+pm2 start proxy.mjs --name cch-proxy
+pm2 save
+pm2 startup
+```
+
+## 技术原理
+
+### CCH 计算流程
+
+```
+原始请求 body (JSON)
+       │
+       ▼
+┌─────────────────────────┐
+│ 在 system[0].text 开头  │
+│ 注入 cch=00000 占位符   │
+└─────────────────────────┘
+       │
+       ▼
+┌─────────────────────────┐
+│ xxhash64(body, seed)    │
+│ seed = 0x6E52736AC806831E │
+└─────────────────────────┘
+       │
+       ▼
+┌─────────────────────────┐
+│ 取 hash 低 20 bits      │
+│ → 5 位十六进制字符串    │
+└─────────────────────────┘
+       │
+       ▼
+┌─────────────────────────┐
+│ 替换 cch=00000          │
+│ → cch=<hash>            │
+└─────────────────────────┘
+       │
+       ▼
+  转发到上游 API
+```
+
+### 注入位置
+
+```json
+{
+  "system": [
+    {
+      "type": "text",
+      "text": "cch=19afa\nYou are a helpful assistant..."
+    }
+  ]
+}
+```
+
+### 安全说明
+
+- 代理不修改 API Key，仅注入 CCH
+- 所有请求日志仅在本地记录
+- 上游通信直接透传，不存储任何数据
+
+## 功能特性
+
+| 功能 | 状态 |
+|------|------|
+| CCH 自动注入 | ✅ |
+| xxhash64 哈希计算 | ✅ |
+| 多上游渠道支持 | ✅ |
+| 空回复自动重试 | ✅ |
+| SSE 流式透传 | ✅ |
+| Node.js 支持 | ✅ |
+| Deno 支持 | ✅ |
+| CF Workers 支持 | ✅ |
+
+## 项目结构
+
+```
+cc-cch/
+├── src/
+│   ├── cch.js          # 核心 CCH 计算逻辑（平台无关）
+│   └── worker.js       # Cloudflare Workers 入口
+├── proxy.mjs           # Node.js 入口
+├── deno.mjs            # Deno 入口
+├── wrangler.toml       # CF Workers 配置
+├── package.json        # npm 配置
+├── README.md           # 本文档
+└── reference.md        # 逆向分析原文
+```
+
+## 参考资料
+
+- [逆向分析文档](./reference.md) - 原始 Claude Code CCH 逆向过程
+- [Anthropic API 文档](https://docs.anthropic.com/en/api/messages)
+- [xxhash-wasm](https://github.com/jungomi/xxhash-wasm)
+
+## License
+
+MIT
