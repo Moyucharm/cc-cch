@@ -21,16 +21,17 @@ function forwardRequest(targetUrl, options, body, retryCount = 0) {
     const parsedUrl = new URL(targetUrl)
     const protocol = parsedUrl.protocol === 'https:' ? https : http
 
+    const headers = { ...options.headers, host: parsedUrl.hostname }
+    if (body) {
+      headers['content-length'] = Buffer.byteLength(body)
+    }
+
     const reqOptions = {
       hostname: parsedUrl.hostname,
       port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
       path: parsedUrl.pathname + parsedUrl.search,
       method: options.method,
-      headers: {
-        ...options.headers,
-        host: parsedUrl.hostname,
-        'content-length': Buffer.byteLength(body)
-      },
+      headers,
       timeout: TIMEOUT
     }
 
@@ -77,7 +78,9 @@ function forwardRequest(targetUrl, options, body, retryCount = 0) {
       }
     })
 
-    req.write(body)
+    if (body) {
+      req.write(body)
+    }
     req.end()
   })
 }
@@ -97,16 +100,18 @@ async function handleRequest(req, res) {
   }
   const rawBody = Buffer.concat(chunks).toString('utf-8')
 
-  if (!rawBody) {
-    res.writeHead(400, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ error: 'Empty request body' }))
-    return
-  }
+  let processedBody = rawBody
+  let cch = null
 
-  const { body: processedBody, injected, cch } = computeCch(rawBody, h64Raw)
-
-  if (injected) {
-    console.log(`[CCH-PROXY] ${req.method} -> ${targetUrl} | cch=${cch}`)
+  if (rawBody && req.method === 'POST') {
+    const result = computeCch(rawBody, h64Raw)
+    processedBody = result.body
+    cch = result.cch
+    if (result.injected) {
+      console.log(`[CCH-PROXY] ${req.method} -> ${targetUrl} | cch=${cch}`)
+    }
+  } else {
+    console.log(`[CCH-PROXY] ${req.method} -> ${targetUrl}`)
   }
 
   const upstreamHeaders = { ...req.headers }
@@ -117,7 +122,7 @@ async function handleRequest(req, res) {
     const upstreamRes = await forwardRequest(targetUrl, {
       method: req.method,
       headers: upstreamHeaders
-    }, processedBody)
+    }, processedBody || null)
 
     const responseHeaders = { ...upstreamRes.headers }
     delete responseHeaders['transfer-encoding']

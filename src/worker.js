@@ -55,27 +55,19 @@ export default {
       })
     }
 
-    if (request.method !== 'POST') {
-      return new Response(JSON.stringify({ error: 'Only POST requests supported' }), {
-        status: 405,
-        headers: { 'Content-Type': 'application/json' }
-      })
-    }
-
     const rawBody = await request.text()
+    let processedBody = rawBody
+    let cch = null
 
-    if (!rawBody) {
-      return new Response(JSON.stringify({ error: 'Empty request body' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      })
-    }
-
-    const { body: processedBody, injected, cch } = computeCch(rawBody, h64Raw)
-
-    if (env.DEBUG || injected) {
+    if (rawBody && request.method === 'POST') {
+      const result = computeCch(rawBody, h64Raw)
+      processedBody = result.body
+      cch = result.cch
+      if (result.injected) {
+        console.log(`[CCH-PROXY] ${request.method} -> ${targetUrl} | cch=${cch}`)
+      }
+    } else {
       console.log(`[CCH-PROXY] ${request.method} -> ${targetUrl}`)
-      if (injected) console.log(`[CCH-PROXY] Injected cch=${cch}`)
     }
 
     const upstreamHeaders = new Headers(request.headers)
@@ -86,7 +78,7 @@ export default {
       const upstreamRes = await forwardWithRetry(targetUrl, {
         method: request.method,
         headers: upstreamHeaders
-      }, processedBody)
+      }, processedBody || null)
 
       const responseHeaders = new Headers(upstreamRes.headers)
       responseHeaders.delete('transfer-encoding')
