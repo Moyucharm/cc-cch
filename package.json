@@ -2,14 +2,20 @@
   "name": "cch-proxy",
   "version": "1.0.0",
   "type": "module",
-  "description": "Claude Code CCH injection proxy for OpenCode",
+  "description": "Claude Code CCH injection proxy for OpenCode - supports Node.js, Deno, and Cloudflare Workers",
   "main": "proxy.mjs",
   "scripts": {
     "start": "node proxy.mjs",
-    "dev": "node --watch proxy.mjs"
+    "dev": "node --watch proxy.mjs",
+    "start:deno": "deno run --allow-net --allow-read --allow-env deno.mjs",
+    "deploy:cf": "wrangler deploy",
+    "dev:cf": "wrangler dev"
   },
   "dependencies": {
     "xxhash-wasm": "^1.1.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
