@@ -3,6 +3,7 @@ import https from 'https'
 import { URL } from 'url'
 import xxhash from 'xxhash-wasm'
 import { computeCch, parseProxyUrl, sleep } from './src/cch.js'
+import { buildUpstreamHeaders } from './src/upstream-headers.js'
 
 const PORT = parseInt(process.env.CCH_PROXY_PORT) || 9876
 const MAX_RETRIES = parseInt(process.env.CCH_MAX_RETRIES) || 3
@@ -114,9 +115,7 @@ async function handleRequest(req, res) {
     console.log(`[CCH-PROXY] ${req.method} -> ${targetUrl}`)
   }
 
-  const upstreamHeaders = { ...req.headers }
-  delete upstreamHeaders['host']
-  delete upstreamHeaders['content-length']
+  const upstreamHeaders = buildUpstreamHeaders(req.headers)
 
   try {
     const upstreamRes = await forwardRequest(targetUrl, {

@@ -1,5 +1,6 @@
 import xxhash from 'xxhash-wasm'
-import { computeCch, parseProxyUrl } from './src/cch.js'
+import { computeCch, parseProxyUrl } from './cch.js'
+import { buildUpstreamHeaders } from './upstream-headers.js'
 
 const MAX_RETRIES = 3
 const TIMEOUT = 120000
@@ -70,9 +71,7 @@ export default {
       console.log(`[CCH-PROXY] ${request.method} -> ${targetUrl}`)
     }
 
-    const upstreamHeaders = new Headers(request.headers)
-    upstreamHeaders.delete('host')
-    upstreamHeaders.delete('content-length')
+    const upstreamHeaders = buildUpstreamHeaders(request.headers)
 
     try {
       const upstreamRes = await forwardWithRetry(targetUrl, {

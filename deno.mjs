@@ -1,5 +1,6 @@
 import xxhash from 'npm:xxhash-wasm'
 import { computeCch, parseProxyUrl } from './src/cch.js'
+import { buildUpstreamHeaders } from './src/upstream-headers.js'
 
 const PORT = Deno.env.get('CCH_PROXY_PORT') || 9876
 const MAX_RETRIES = parseInt(Deno.env.get('CCH_MAX_RETRIES')) || 3
@@ -70,9 +71,7 @@ async function handler(req) {
     console.log(`[CCH-PROXY] ${req.method} -> ${targetUrl}`)
   }
 
-  const upstreamHeaders = new Headers(req.headers)
-  upstreamHeaders.delete('host')
-  upstreamHeaders.delete('content-length')
+  const upstreamHeaders = buildUpstreamHeaders(req.headers)
 
   try {
     const upstreamRes = await forwardWithRetry(targetUrl, {

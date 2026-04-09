@@ -169,8 +169,9 @@ pm2 startup
 ### 安全说明
 
 - 代理不修改 API Key，仅注入签名
+- 上游请求头默认标准化为 Claude Code 风格，并透传 `Authorization` 与 `Content-Type`
 - 所有请求日志仅在本地记录
-- 上游通信直接透传，不存储任何数据
+- 请求体与响应体直接透传，不存储任何数据
 
 ## 功能特性
 
@@ -179,6 +180,7 @@ pm2 startup
 | 签名自动注入 | ✅ |
 | xxhash64 哈希计算 | ✅ |
 | 多上游渠道支持 | ✅ |
+| Claude Code 请求头固定化 | ✅ |
 | 空回复自动重试 | ✅ |
 | SSE 流式透传 | ✅ |
 | Node.js 支持 | ✅ |
@@ -191,6 +193,7 @@ pm2 startup
 cc-cch/
 ├── src/
 │   ├── cch.js          # 核心签名计算逻辑（平台无关）
+│   ├── upstream-headers.js # 上游请求头标准化逻辑
 │   └── worker.js       # Cloudflare Workers 入口
 ├── proxy.mjs           # Node.js 入口
 ├── deno.mjs            # Deno 入口
