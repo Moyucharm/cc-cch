@@ -18,6 +18,12 @@ export const CLAUDE_CODE_UPSTREAM_HEADERS = {
   'Accept': 'text/event-stream'
 }
 
+const PASSTHROUGH_HEADER_NAME_MAP = {
+  authorization: 'Authorization',
+  'x-api-key': 'X-API-Key',
+  'content-type': 'Content-Type'
+}
+
 function normalizeHeaderValue(value) {
   if (typeof value === 'string') {
     return value
@@ -52,14 +58,11 @@ function readHeader(inputHeaders, name) {
 export function buildUpstreamHeaders(inputHeaders) {
   const headers = { ...CLAUDE_CODE_UPSTREAM_HEADERS }
 
-  const authorization = readHeader(inputHeaders, 'authorization')
-  if (authorization) {
-    headers.Authorization = authorization
-  }
-
-  const contentType = readHeader(inputHeaders, 'content-type')
-  if (contentType) {
-    headers['Content-Type'] = contentType
+  for (const [headerName, outputHeaderName] of Object.entries(PASSTHROUGH_HEADER_NAME_MAP)) {
+    const value = readHeader(inputHeaders, headerName)
+    if (value) {
+      headers[outputHeaderName] = value
+    }
   }
 
   return headers

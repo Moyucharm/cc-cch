@@ -169,7 +169,7 @@ pm2 startup
 ### 安全说明
 
 - 代理不修改 API Key，仅注入签名
-- 上游请求头默认标准化为 Claude Code 风格，并透传 `Authorization` 与 `Content-Type`
+- 上游请求头默认标准化为 Claude Code 风格，并透传 Claude 鉴权头 `Authorization` / `X-API-Key` 与 `Content-Type`
 - 所有请求日志仅在本地记录
 - 请求体与响应体直接透传，不存储任何数据
 
